@@ -11,7 +11,7 @@ class ClassRoomModel extends BaseModel
         $this->ClassRoomModel = new BaseModel($this->table);
     }
 
-    public function index()
+    public function index($sql = null)
     {
         return $this->ClassRoomModel->index();
     }

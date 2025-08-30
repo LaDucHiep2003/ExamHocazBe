@@ -13,7 +13,7 @@ class ResultModel extends BaseModel
         $this->ResultModel = new BaseModel($this->table);
     }
 
-    public function index()
+    public function index($sql = null)
     {
         return $this->ResultModel->index();
     }

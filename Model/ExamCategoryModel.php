@@ -13,7 +13,7 @@ class ExamCategoryModel extends BaseModel
         $this->ExamCategoryModel = new BaseModel($this->table);
     }
 
-    public function index()
+    public function index($sql = null)
     {
         return $this->ExamCategoryModel->index();
     }

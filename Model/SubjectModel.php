@@ -13,7 +13,7 @@ class SubjectModel extends BaseModel
         $this->SubjectModel = new BaseModel($this->table);
     }
 
-    public function index()
+    public function index($sql = null)
     {
         return $this->SubjectModel->index();
     }

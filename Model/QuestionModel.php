@@ -1,5 +1,7 @@
 <?php
 include_once __DIR__ . '/../Model/BaseModel.php';
+include_once __DIR__ . "/../Connection/Connection.php";
+
 class QuestionModel extends BaseModel
 {
     protected $QuestionModel;
@@ -8,10 +10,52 @@ class QuestionModel extends BaseModel
     {
         $this->table = 'questions';
         $this->QuestionModel = new BaseModel($this->table);
+        $this->conn = ConnectionDB::GetConnect();
     }
-    public function index()
+    public function index($sql = null)
     {
-        return $this->QuestionModel->index();
+        // query câu hỏi
+        $sql = "
+        SELECT q.*, s.name, s.code
+        FROM {$this->table} q
+        INNER JOIN subjects s ON q.subject_id = s.id
+        WHERE q.deleted = false
+    ";
+        $result = $this->QuestionModel->index($sql);
+
+        // lấy danh sách question_id trong page hiện tại
+        $questionIds = array_column($result['data'], 'id');
+        if (empty($questionIds)) {
+            $result['data'] = [];
+            return $result;
+        }
+
+        // query options của các question đó
+        $inQuery = implode(',', array_fill(0, count($questionIds), '?'));
+        $sqlOptions = "
+        SELECT o.question_id, o.option_text, o.is_correct
+        FROM question_options o
+        WHERE o.question_id IN ($inQuery)
+    ";
+        $stmt = $this->conn->prepare($sqlOptions);
+        $stmt->execute($questionIds);
+        $options = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // group options theo question_id
+        $optionsByQuestion = [];
+        foreach ($options as $opt) {
+            $optionsByQuestion[$opt['question_id']][] = [
+                'text' => $opt['option_text'],
+                'is_correct' => (bool)$opt['is_correct']
+            ];
+        }
+
+        // gắn answers vào từng question
+        foreach ($result['data'] as &$q) {
+            $q['answers'] = isset($optionsByQuestion[$q['id']]) ? $optionsByQuestion[$q['id']] : [];
+        }
+
+        return $result;
     }
 
     public function createQuestion($data)

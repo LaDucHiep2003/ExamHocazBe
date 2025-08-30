@@ -18,7 +18,7 @@ class UserModel extends BaseModel
         $this->conn = ConnectionDB::GetConnect();
     }
 
-    public function index()
+    public function index($sql = null)
     {
         return $this->UserModel->index();
     }

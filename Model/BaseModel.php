@@ -10,31 +10,35 @@ class BaseModel
         $this->table = $table;
         $this->conn = ConnectionDB::GetConnect();
     }
-    // lấy dữ liệu
-    public function index()
+    public function index($sql = null)
     {
-        // phân trang
-        $page = isset($_GET['page']) ? $_GET['page'] : 1;
-        $limit = 20;
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         $offset = ($page - 1) * $limit;
-        // lấy tổng số bản ghi trong table
-        $count_query = $this->conn->prepare("SELECT COUNT(*) as total from $this->table where status = false");
+
+        if ($sql === null) {
+            $sql = "SELECT * FROM {$this->table} WHERE deleted = false";
+        }
+
+        // tổng số bản ghi (dùng subquery để đếm)
+        $count_query = $this->conn->prepare("SELECT COUNT(*) as total FROM ($sql) AS sub");
         $count_query->execute();
         $record_total = $count_query->fetch(PDO::FETCH_ASSOC)['total'];
-        // tổng số trang
-        // ceil hàm lấy phần nguyên
         $page_total = ceil($record_total / $limit);
-        // lấy danh sách có phân trang
-        $query = $this->conn->prepare("select * from $this->table  where status = false LIMIT :limit OFFSET :offset");
-        // $query = $this->conn->prepare("select * from $this->table");
-        // gán các giá trị nguyên cho limit và offset
+
+        // query dữ liệu có phân trang
+        $query = $this->conn->prepare("$sql LIMIT :limit OFFSET :offset");
         $query->bindParam(':limit', $limit, PDO::PARAM_INT);
         $query->bindParam(':offset', $offset, PDO::PARAM_INT);
-        // $query->execute([':limit' => (int)$limit, ':offset' => (int)$offset]);
         $query->execute();
-        return ['data' => $query->fetchAll(), 'limit' => $limit, 'current_page' => $page, 'total_page' => $page_total, 'record_total' => $record_total];
-        // return $query->fetchAll();
 
+        return [
+            'data' => $query->fetchAll(PDO::FETCH_ASSOC),
+            'limit' => $limit,
+            'current_page' => $page,
+            'total_page' => $page_total,
+            'record_total' => $record_total
+        ];
     }
     // create dữ liệu
     public function create($data)
