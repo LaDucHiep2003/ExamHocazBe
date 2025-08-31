@@ -65,7 +65,7 @@ class BaseModel
     public function read($id)
     {
         try {
-            $query = $this->conn->prepare("select * from $this->table where id=:id and status = false");
+            $query = $this->conn->prepare("select * from $this->table where id=:id and deleted = false");
             $query->execute(['id' => $id]);
         } catch (Throwable $e) {
             return null;
@@ -77,7 +77,7 @@ class BaseModel
     {
         try {
             $query = $this->conn->prepare("update $this->table
-                set status = true 
+                set deleted = true 
                 where id=:id");
             $query->execute(['id' => $id]);
         } catch (Throwable $e) {

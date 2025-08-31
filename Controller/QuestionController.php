@@ -46,16 +46,6 @@ class QuestionsController
     public function edit($id)
     {
         $data = json_decode(file_get_contents("php://input"), true);
-        // kiểm tra dữ liệu tránh truyền script vào input
-        foreach ($data as $key => $value) {
-            if ($key !== 'answerlist') { // Không áp dụng htmlspecialchars cho mảng answerlist
-                $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-            }
-        }
-        // Chuyển danh sách câu trả lời thành chuỗi JSON
-        if (isset($data['answerlist']) && is_array($data['answerlist'])) {
-            $data['answerlist'] = json_encode($data['answerlist'], JSON_UNESCAPED_UNICODE);
-        }
         if ($id == 0) {
             echo json_encode(['message' => 'Dữ liệu câu hỏi không tồn tại !']);
         } else {
