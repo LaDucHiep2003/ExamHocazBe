@@ -15,7 +15,15 @@ class ExamModel extends BaseModel
 
     public function index($sql = null)
     {
-        return $this->ExamModel->index();
+        $sql = "
+            SELECT e.*, s.name as subject_name, u.full_name as creator, u.id as user_id
+            FROM {$this->table} e
+            INNER JOIN subjects s ON e.subject_id = s.id
+            INNER JOIN users u ON e.created_by = u.id
+            WHERE e.deleted = false
+        ";
+        $result = $this->ExamModel->index($sql);
+        return $result;
     }
     public function createExam($data)
     {
