@@ -29,10 +29,10 @@ class ExamModel extends BaseModel
     {
         $subject_id = $data['subject_id'];
         $query = $this->conn->prepare("INSERT INTO exams (name, description, subject_id, start_time, end_time,duration_minutes, 
-                   created_by,status, type,maxScore, passingScore, totalQuestions, difficulty )
+                   created_by,status, type,maxScore, passingScore, totalQuestions, difficulty, questionSource )
                    VALUES (
                         :name, :description, :subject_id, :start_time, :end_time, :duration_minutes,
-                        :created_by, :status, :type, :maxScore, :passingScore, :totalQuestions, :difficulty
+                        :created_by, :status, :type, :maxScore, :passingScore, :totalQuestions, :difficulty, :questionSource
                     )
         ");
         try {
@@ -49,7 +49,8 @@ class ExamModel extends BaseModel
                 'maxScore' => $data['maxScore'],
                 'passingScore' => $data['passingScore'],
                 'totalQuestions' => $data['totalQuestions'],
-                'difficulty' => $data['difficulty']
+                'difficulty' => $data['difficulty'],
+                'questionSource' => $data['questionSource']
             ]);
             $exam_id = $this->conn->lastInsertId();
 
@@ -89,22 +90,128 @@ class ExamModel extends BaseModel
         return $this->ExamModel->delete($id);
     }
 
-    public function edit($data, $id)
+    public function edit($data)
     {
-        return $this->ExamModel->update($data, $id);
+        $subject_id = $data['subject_id'];
+        $id = $data['id'];
+
+        $query = $this->conn->prepare("
+        UPDATE exams 
+        SET name = :name,
+            description = :description,
+            subject_id = :subject_id,
+            start_time = :start_time,
+            end_time = :end_time,
+            duration_minutes = :duration_minutes,
+            status = :status,
+            type = :type,
+            maxScore = :maxScore,
+            passingScore = :passingScore,
+            totalQuestions = :totalQuestions,
+            difficulty = :difficulty,
+            questionSource = :questionSource
+            
+        WHERE id = :id AND deleted = false
+    ");
+
+        try {
+            // Update exam
+            $query->execute([
+                'name' => $data['name'],
+                'description' => $data['description'],
+                'subject_id' => $data['subject_id'],
+                'start_time' => $data['start_time'],
+                'end_time' => $data['end_time'],
+                'duration_minutes' => $data['duration_minutes'],
+                'status' => $data['status'],
+                'type' => $data['type'],
+                'maxScore' => $data['maxScore'],
+                'passingScore' => $data['passingScore'],
+                'totalQuestions' => $data['totalQuestions'],
+                'difficulty' => $data['difficulty'],
+                'questionSource' => $data['questionSource'],
+                'id' => $id
+            ]);
+
+            // Xóa hết câu hỏi cũ của exam
+            $deleteQuery = $this->conn->prepare("DELETE FROM exam_questions WHERE exam_id = :exam_id");
+            $deleteQuery->execute(['exam_id' => $id]);
+
+            // Thêm lại câu hỏi mới
+            if ($data['questionSource'] === 'manual') {
+                $questionCount = isset($data['totalQuestions']) ? (int)$data['totalQuestions'] : 3;
+                $questionQuery = $this->conn->prepare("
+                SELECT id FROM questions 
+                WHERE subject_id = :subject_id AND deleted = false 
+                ORDER BY RAND() 
+                LIMIT $questionCount
+            ");
+                $questionQuery->execute(['subject_id' => $subject_id]);
+                $questions = $questionQuery->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($questions as $question) {
+                    $examQuestionQuery = $this->conn->prepare("
+                    INSERT INTO exam_questions (exam_id, question_id) 
+                    VALUES (:exam_id, :question_id)
+                ");
+                    $examQuestionQuery->execute([
+                        'exam_id' => $id,
+                        'question_id' => $question['id']
+                    ]);
+                }
+            } else {
+                foreach ($data['selectedQuestions'] as $question) {
+                    $examQuestionQuery = $this->conn->prepare("
+                    INSERT INTO exam_questions (exam_id, question_id) 
+                    VALUES (:exam_id, :question_id)
+                ");
+                    $examQuestionQuery->execute([
+                        'exam_id' => $id,
+                        'question_id' => $question
+                    ]);
+                }
+            }
+        } catch (Throwable $e) {
+            // Xử lý lỗi
+            return false;
+        }
+
+        return true;
     }
     public function detail($id)
     {
         try {
-            $query = $this->conn->prepare("Select exams.*,subjects.id as id_subject, subjects.id_category  from exams
-                inner join chapters on exams.id_chapter = chapters.id
-                inner join subjects on chapters.id_subject = subjects.id
-                where exams.id = :id");
-            $query->execute(['id' => $id]);
+            // Lấy thông tin chi tiết bài thi
+            $examQuery = $this->conn->prepare("
+                SELECT e.*
+                FROM exams e
+                WHERE e.id = :id AND e.deleted = false
+            ");
+            $examQuery->execute(['id' => $id]);
+            $exam = $examQuery->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$exam) {
+                return null;
+            }
+            
+            // Lấy danh sách câu hỏi của bài thi
+            $questionsQuery = $this->conn->prepare("
+                SELECT q.id
+                FROM questions q
+                INNER JOIN exam_questions eq ON q.id = eq.question_id
+                WHERE eq.exam_id = :exam_id AND q.deleted = false
+            ");
+            $questionsQuery->execute(['exam_id' => $id]);
+            $questions = $questionsQuery->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Gộp thông tin bài thi và câu hỏi
+            $exam['selectedQuestions'] = array_column($questions, 'id');
+            
+            return $exam;
+            
         } catch (Throwable $e) {
             return null;
         }
-        return $query->fetch();
     }
     public function getExamsOfChapter($id)
     {

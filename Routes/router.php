@@ -162,8 +162,8 @@ $routers = [
     ],
 
     "PATCH" => [
-        '/exams/(\d+)' => function ($id) use ($ExamController) {
-            $ExamController->edit($id);
+        '/exams' => function () use ($ExamController) {
+            $ExamController->edit();
         },
         '/category/(\d+)' => function ($id) use ($ExamCategoryController) {
             $ExamCategoryController->edit($id);

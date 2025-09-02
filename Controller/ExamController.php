@@ -45,21 +45,13 @@ class ExamController
         echo json_encode(['data' => $result]);
     }
 
-    public function edit($id)
+    public function edit()
     {
         $data = json_decode(file_get_contents("php://input"), true);
-        // kiểm tra dữ liệu tránh truyền script vào input
-        foreach ($data as $key => $value) {
-            $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-        }
-        if ($id == 0) {
-            echo json_encode(['message' => 'Dữ liệu bài thi không tồn tại !']);
+        if (!$this->ExamModel->edit($data)) {
+            echo json_encode(['message' => 'Cập nhật bài thi không thành công !']);
         } else {
-            if (!$this->ExamModel->edit($data, $id)) {
-                echo json_encode(['message' => 'Cập nhật bài thi không thành công !']);
-            } else {
-                echo json_encode(['message' => 'Cập nhật bài thi thành công !']);
-            }
+            echo json_encode(['message' => 'Cập nhật bài thi thành công !']);
         }
     }
 
