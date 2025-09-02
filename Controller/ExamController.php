@@ -19,10 +19,6 @@ class ExamController
     public function create()
     {
         $data = json_decode(file_get_contents("php://input"), true);
-        // kiểm tra dữ liệu tránh truyền script vào input
-        foreach ($data as $key => $value) {
-            $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-        }
         if (!$this->ExamModel->createExam($data)) {
             echo json_encode(['message' => "Có lỗi xảy ra !"]);
         } else {

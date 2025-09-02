@@ -27,33 +27,55 @@ class ExamModel extends BaseModel
     }
     public function createExam($data)
     {
-        $id_subject = $data['id_subject'];
-        $query = $this->conn->prepare("INSERT INTO exams (title, description, id_chapter, duration, total_questions)
-            VALUES (:title, :description, :id_chapter, :duration, :total_questions)
+        $subject_id = $data['subject_id'];
+        $query = $this->conn->prepare("INSERT INTO exams (name, description, subject_id, start_time, end_time,duration_minutes, 
+                   created_by,status, type,maxScore, passingScore, totalQuestions, difficulty )
+                   VALUES (
+                        :name, :description, :subject_id, :start_time, :end_time, :duration_minutes,
+                        :created_by, :status, :type, :maxScore, :passingScore, :totalQuestions, :difficulty
+                    )
         ");
         try {
             $query->execute([
-                'title' => $data['title'],
+                'name' => $data['name'],
                 'description' => $data['description'],
-                'id_chapter' => $data['id_chapter'],
-                'duration' => $data['duration'],
-                'total_questions' => $data['total_questions'],
+                'subject_id' => $data['subject_id'],
+                'start_time' => $data['start_time'],
+                'end_time' => $data['end_time'],
+                'duration_minutes' => $data['duration_minutes'],
+                'created_by' => $data['created_by'],
+                'status' => $data['status'],
+                'type' => $data['type'],
+                'maxScore' => $data['maxScore'],
+                'passingScore' => $data['passingScore'],
+                'totalQuestions' => $data['totalQuestions'],
+                'difficulty' => $data['difficulty']
             ]);
             $exam_id = $this->conn->lastInsertId();
 
-            $questionCount = isset($data['total_questions']) ? (int)$data['total_questions'] : 3; // Mặc định là 3 nếu không có dữ liệu
+            if($data['questionSource'] === 'manual'){
+                $questionCount = isset($data['totalQuestions']) ? (int)$data['totalQuestions'] : 3; // Mặc định là 3 nếu không có dữ liệu
+                $questionQuery = $this->conn->prepare("SELECT id FROM questions where subject_id=:subject_id and deleted = false ORDER BY RAND() LIMIT $questionCount");
+                $questionQuery->execute(['subject_id' => $subject_id]);
+                $questions = $questionQuery->fetchAll(PDO::FETCH_ASSOC);
 
-            $questionQuery = $this->conn->prepare("SELECT id FROM questions where id_subject=:id_subject ORDER BY RAND() LIMIT $questionCount");
-            $questionQuery->execute(['id_subject' => $id_subject]);
-            $questions = $questionQuery->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($questions as $question) {
-                $examQuestionQuery = $this->conn->prepare("INSERT INTO question_exam (id_exam, id_question) VALUES (:id_exam, :id_question)");
-                $examQuestionQuery->execute([
-                    'id_exam' => $exam_id,
-                    'id_question' => $question['id']
-                ]);
+                foreach ($questions as $question) {
+                    $examQuestionQuery = $this->conn->prepare("INSERT INTO exam_questions (exam_id, question_id) VALUES (:exam_id, :question_id)");
+                    $examQuestionQuery->execute([
+                        'exam_id' => $exam_id,
+                        'question_id' => $question['id']
+                    ]);
+                }
+            }else{
+                foreach ($data['selectedQuestions'] as $question) {
+                    $examQuestionQuery = $this->conn->prepare("INSERT INTO exam_questions (exam_id, question_id) VALUES (:exam_id, :question_id)");
+                    $examQuestionQuery->execute([
+                        'exam_id' => $exam_id,
+                        'question_id' => $question
+                    ]);
+                }
             }
+
         } catch (Throwable $e) {
             // Xử lý lỗi nếu có
             return false;
