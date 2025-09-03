@@ -180,8 +180,8 @@ $routers = [
         '/chapter/(\d+)' => function ($id) use ($ChapterController) {
             $ChapterController->edit($id);
         },
-        '/users/(\d+)' => function ($id) use ($UserController) {
-            $UserController->edit($id);
+        '/users' => function () use ($UserController) {
+            $UserController->edit();
         },
     ],
 
@@ -204,7 +204,7 @@ $routers = [
         "/chapter/(\d+)" => function ($id) use ($ChapterController) {
             $ChapterController->delete($id);
         },
-        "/accounts/(\d+)" => function ($id) use ($UserController) {
+        "/users/(\d+)" => function ($id) use ($UserController) {
             $UserController->delete($id);
         }
     ],

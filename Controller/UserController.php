@@ -24,29 +24,24 @@ class UserController
         echo json_encode(['data' => $result]);
     }
 
-    public function edit($id)
+    public function edit()
     {
         $data = json_decode(file_get_contents("php://input"), true);
         $data['password'] = md5($data['password']);
 
-        // kiểm tra dữ liệu tránh truyền script vào input
         foreach ($data as $key => $value) {
             $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         }
-        if ($id == 0) {
-            echo json_encode(['message' => 'Dữ liệu bài thi không tồn tại !']);
+        if (!$this->UserModel->edit($data)) {
+            echo json_encode(['message' => 'Cập nhật tài khoản không thành công !']);
         } else {
-            if (!$this->UserModel->edit($data, $id)) {
-                echo json_encode(['message' => 'Cập nhật tài khoản không thành công !']);
-            } else {
-                echo json_encode(['message' => 'Cập nhật tài khoản thành công !']);
-            }
+            echo json_encode(['message' => 'Cập nhật tài khoản thành công !']);
         }
     }
     public function delete($id)
     {
         if ($id == 0) {
-            echo json_encode(['message' => 'Câu hỏi không tồn tại !']);
+            echo json_encode(['message' => 'tài khoản không tồn tại !']);
         } else {
             if (!$this->UserModel->delete($id)) {
                 echo json_encode(['message' => 'Có lỗi xảy ra !']);
@@ -64,6 +59,7 @@ class UserController
     public function register()
     {
         $data = json_decode(file_get_contents("php://input"),true);
+        $data['password'] = md5($data['password']);
         $this->UserModel->register($data);
     }
 

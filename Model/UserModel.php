@@ -20,7 +20,9 @@ class UserModel extends BaseModel
 
     public function index($sql = null)
     {
-        return $this->UserModel->index();
+        $sql = "select s.*, r.name as role_name from users s
+            inner join role r on s.role_id = r.id where s.deleted = false";
+        return $this->UserModel->index($sql);
     }
 
     public function detail($id)
@@ -28,9 +30,9 @@ class UserModel extends BaseModel
         return $this->UserModel->read($id);
     }
 
-    public function edit($data, $id)
+    public function edit($data)
     {
-        return $this->UserModel->update($data, $id);
+        return $this->UserModel->update($data);
     }
     public function delete($id)
     {
@@ -39,11 +41,7 @@ class UserModel extends BaseModel
 
     public function register($data)
     {
-        $name = $data['name'];
         $email = $data['email'];
-        $phone = $data['phone'];
-        $pass = md5($data['password']);
-        $role = $data['role'];
         try {
             $this->conn->beginTransaction();
             $query = $this->conn->prepare("select id from $this->table where email=:email");
@@ -51,8 +49,7 @@ class UserModel extends BaseModel
             if ($query->rowCount() > 0) {
                 echo json_encode(['message' => 'Email đã tồn tại']);
             } else {
-                $query2 = $this->conn->prepare("insert into $this->table (name,password,email,role,phone) values (:name,:pass,:email,:role,:phone)");
-                $query2->execute(['name' => $name, 'pass' => $pass, 'email' => $email, 'role' => $role, 'phone' => $phone]);
+                $this->UserModel->create($data);
                 echo json_encode(['message' => 'Đăng ký tài khoản thành công']);
             }
             $this->conn->commit();
