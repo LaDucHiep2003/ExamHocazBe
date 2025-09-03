@@ -129,7 +129,7 @@ $routers = [
         "/categoryparent" => function () use ($CategoryParentController) {
             $CategoryParentController->create();
         },
-        "/subject" => function () use ($SubjectController) {
+        "/subjects" => function () use ($SubjectController) {
             $SubjectController->create();
         },
         "/chapter" => function () use ($ChapterController) {
@@ -174,8 +174,8 @@ $routers = [
         '/questions/(\d+)' => function ($id) use ($QuestionController) {
             $QuestionController->edit($id);
         },
-        '/subject/(\d+)' => function ($id) use ($SubjectController) {
-            $SubjectController->edit($id);
+        '/subjects' => function () use ($SubjectController) {
+            $SubjectController->edit();
         },
         '/chapter/(\d+)' => function ($id) use ($ChapterController) {
             $ChapterController->edit($id);

@@ -28,7 +28,7 @@ class SubjectController
         foreach ($data as $key => $value) {
             $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         }
-        if ($this->SubjectModel->create($data) == false) {
+        if (!$this->SubjectModel->create($data)) {
             echo json_encode(['message' => "Có lỗi xảy ra !"]);
         } else {
             echo json_encode(['message' => "Tạo mới môn học thành công !"]);
@@ -39,21 +39,17 @@ class SubjectController
         $result = $this->SubjectModel->detail($id);
         echo json_encode(['data' => $result]);
     }
-    public function edit($id)
+    public function edit()
     {
         $data = json_decode(file_get_contents("php://input"), true);
         // kiểm tra dữ liệu tránh truyền script vào input
         foreach ($data as $key => $value) {
             $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         }
-        if ($id == 0) {
-            echo json_encode(['message' => 'Dữ liệu danh mục bài thi không tồn tại !']);
+        if (!$this->SubjectModel->edit($data)) {
+            echo json_encode(['message' => 'Error !']);
         } else {
-            if (!$this->SubjectModel->edit($data, $id)) {
-                echo json_encode(['message' => 'Error !']);
-            } else {
-                echo json_encode(['message' => 'Cập nhật môn học thành công !']);
-            }
+            echo json_encode(['message' => 'Cập nhật môn học thành công !']);
         }
     }
     public function delete($id)

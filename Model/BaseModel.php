@@ -86,13 +86,14 @@ class BaseModel
         return true;
     }
     // update data
-    public function update($data, $id)
+    public function update($data)
     {
         // kiểm tra dữ liệu tránh truyền script vào input
         // foreach ($data as $key => $value) {
         //     $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         // }
         $string = "";
+        $id = $data['id'];
         $columns = implode(",", array_keys($data));
         $columns_set_name = explode(',', $columns);
         foreach ($columns_set_name as $row) {

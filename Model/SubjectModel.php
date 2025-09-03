@@ -15,7 +15,9 @@ class SubjectModel extends BaseModel
 
     public function index($sql = null)
     {
-        return $this->SubjectModel->index();
+        $sql = "select s.* ,u.full_name from subjects s
+                inner join users u on s.created_by = u.id Where s.deleted = false";
+        return $this->SubjectModel->index($sql);
     }
 
 //    public function getSubjectsOfCategory($id)
@@ -50,9 +52,9 @@ class SubjectModel extends BaseModel
     {
         return $this->SubjectModel->create($data);
     }
-    public function edit($data, $id)
+    public function edit($data)
     {
-        return $this->SubjectModel->update($data, $id);
+        return $this->SubjectModel->update($data);
     }
     public function delete($id)
     {
