@@ -21,27 +21,134 @@ class ResultModel extends BaseModel
     public function detail($id)
     {
         try {
-            $query = $this->conn->prepare("select * from $this->table where id=:id");
-            $query->execute(['id' => $id]);
+            // Lấy thông tin attempt
+            $attemptQuery = $this->conn->prepare("
+                SELECT ea.*, e.totalQuestions, e.name, ea.end_time, e.maxScore, e.passingScore, TIMESTAMPDIFF(MINUTE, ea.start_time, ea.end_time) as durationMinutes
+                FROM exam_attempts ea
+                INNER JOIN exams e ON ea.exam_id = e.id
+                WHERE ea.id = :attempt_id
+            ");
+            $attemptQuery->execute(['attempt_id' => $id]);
+            $attempt = $attemptQuery->fetch(PDO::FETCH_ASSOC);
+
+            if (!$attempt) {
+                return null;
+            }
+
+            // Lấy danh sách câu trả lời
+            $answersQuery = $this->conn->prepare("
+                SELECT question_id, option_id, is_correct
+                FROM exam_answers
+                WHERE attempt_id = :attempt_id
+            ");
+            $answersQuery->execute(['attempt_id' => $id]);
+            $answers = $answersQuery->fetchAll(PDO::FETCH_ASSOC);
+
+            $correctCount = 0;
+            $wrongCount = 0;
+            $answeredQuestions = [];
+
+            foreach ($answers as $ans) {
+                $answeredQuestions[] = $ans['question_id'];
+                if ($ans['is_correct'] == 1) {
+                    $correctCount++;
+                } else {
+                    $wrongCount++;
+                }
+            }
+
+            // Tính số câu bỏ trống
+            $emptyCount = $attempt['totalQuestions'] - count(array_unique($answeredQuestions));
+
+            return [
+                'exam_id'         => $attempt['exam_id'],
+                'exam_name'       => $attempt['name'],
+                'user_id'         => $attempt['user_id'],
+                'correctCount'    => $correctCount,
+                'wrongCount'      => $wrongCount,
+                'emptyCount'      => $emptyCount,
+                'end_time'        => $attempt['end_time'],
+                'durationMinutes' => $attempt['durationMinutes'],
+                'score'           => $attempt['score'],
+                'passingScore'    => $attempt['passingScore'],
+                'max_score'       => $attempt['maxScore'],
+                'status'          => $attempt['status']
+            ];
+
         } catch (Throwable $e) {
             return null;
         }
-        return $query->fetch();
     }
 
     public function getQuestion($id)
     {
         try {
-            $query = $this->conn->prepare("select questions.* from results
-                inner join exams on results.id_exam = exams.id
-                inner join question_exam on exams.id = question_exam.id_exam
-                inner join questions on question_exam.id_question = questions.id
-                where results.id=:id");
-            $query->execute(['id' => $id]);
+            // Lấy danh sách câu hỏi trong bài thi attempt này
+            $questionsQuery = $this->conn->prepare("
+            SELECT q.id, q.content
+            FROM exam_answers ea
+            INNER JOIN questions q ON ea.question_id = q.id
+            WHERE ea.attempt_id = :attempt_id
+            GROUP BY q.id, q.content
+        ");
+            $questionsQuery->execute(['attempt_id' => $id]);
+            $questions = $questionsQuery->fetchAll(PDO::FETCH_ASSOC);
+
+            // Lấy tất cả đáp án user đã chọn
+            $answersQuery = $this->conn->prepare("
+            SELECT question_id, option_id
+            FROM exam_answers
+            WHERE attempt_id = :attempt_id
+        ");
+            $answersQuery->execute(['attempt_id' => $id]);
+            $answers = $answersQuery->fetchAll(PDO::FETCH_ASSOC);
+
+            $userAnswersByQuestion = [];
+            foreach ($answers as $ans) {
+                $userAnswersByQuestion[$ans['question_id']][] = $ans['option_id'];
+            }
+
+            $questionDetails = [];
+            foreach ($questions as $q) {
+                $qid = $q['id'];
+
+                // Lấy tất cả options của câu hỏi
+                $optionQuery = $this->conn->prepare("
+                    SELECT id, option_text, is_correct
+                    FROM question_options
+                    WHERE question_id = :qid
+                ");
+                $optionQuery->execute(['qid' => $qid]);
+                $options = $optionQuery->fetchAll(PDO::FETCH_ASSOC);
+
+                // User chọn option nào
+                $userSelected = isset($userAnswersByQuestion[$qid]) ? $userAnswersByQuestion[$qid] : [];
+
+                // Kiểm tra đúng/sai
+                $correctOptionIds = array_column(
+                    array_filter($options, function ($opt) {
+                        return $opt['is_correct'] == 1;
+                    }),
+                    'id'
+                );
+                sort($userSelected);
+                sort($correctOptionIds);
+                $isUserCorrect = ($userSelected == $correctOptionIds);
+
+                $questionDetails[] = [
+                    'question_id'   => $qid,
+                    'content'       => $q['content'],
+                    'options'       => $options,
+                    'userAnswers'   => $userSelected,
+                    'isUserCorrect' => $isUserCorrect
+                ];
+            }
+
+            return $questionDetails;
+
         } catch (Throwable $e) {
-            return null;
+            return $e;
         }
-        return $query->fetchAll();
     }
 
     public function createResult($data)
@@ -50,31 +157,36 @@ class ResultModel extends BaseModel
             if (is_array($value)) continue;
             $data[$key] = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
         }
-        $id_exam = $data['id_exam'];
+        $exam_id = $data['exam_id'];
         $details = $data['details'];
-        $id_user = $data['id_user'];
-        $blank_question = $data['blank_question'];
-        $duration = $data['duration'];
+        $user_id = $data['user_id'];
+        $start_time = $data['start_time'];
+        $end_time = $data['end_time'];
+        $status = $data['status'];
 
-        $queryQuestion = $this->conn->prepare("select count(*) from questions 
-                inner join question_exam on questions.id = question_exam.id_question 
-                where id_exam = :id_exam");
-        $queryQuestion->execute(['id_exam' => $id_exam]);
-        $countQuestion = $queryQuestion->fetchColumn();
-        $scoreOneQuestion = $countQuestion > 0 ? round(10 / $countQuestion, 2) : 0;
+        $queryQuestion = $this->conn->prepare("Select * from exams where id = :exam_id");
+        $queryQuestion->execute(['exam_id' => $exam_id]);
+        $Questions = $queryQuestion->fetch(PDO::FETCH_ASSOC);
+        $scoreOneQuestion = round($Questions['maxScore'] / $Questions['totalQuestions'], 2);
 
         $correctCount = 0;
-        $wrongCount = 0;
 
-        foreach ($details as $userAnswer) {
-            $queryCorrect = $this->conn->prepare("SELECT correct_answer FROM questions WHERE id = :id_question");
-            $queryCorrect->execute(['id_question' => $userAnswer['id_question']]);
-            $correctAnswer = $queryCorrect->fetchColumn();
+        foreach ($details as $question_id => $userAnswers) {
+            // Lấy danh sách đáp án đúng từ question_options
+            $queryCorrect = $this->conn->prepare("
+                SELECT id 
+                FROM question_options 
+                WHERE question_id = :question_id AND is_correct = 1
+            ");
+            $queryCorrect->execute(['question_id' => $question_id]);
+            $correctAnswers = $queryCorrect->fetchAll(PDO::FETCH_COLUMN);
 
-            if ($correctAnswer && strtoupper($userAnswer['answer']) === strtoupper($correctAnswer)) {
+            // So sánh: user chọn == đáp án đúng?
+            sort($userAnswers);     // chuẩn hóa mảng
+            sort($correctAnswers);
+
+            if ($userAnswers == $correctAnswers) {
                 $correctCount++;
-            } else {
-                $wrongCount++;
             }
         }
         $totalScore = round($correctCount * $scoreOneQuestion, 2);
@@ -83,28 +195,48 @@ class ResultModel extends BaseModel
             $this->conn->beginTransaction();
 
             // Thêm dữ liệu vào bảng `result`
-            $query = $this->conn->prepare("Insert into results(id_user, id_exam, score, duration, correct_question, incorrect_question, 
-                    blank_question) VALUES (:id_user, :id_exam, :score, :duration, :correct_question, :incorrect_question, :blank_question)");
-            $query->execute(['id_user' => $id_user, 'id_exam' => $id_exam, 'score' => $totalScore, 'duration' => $duration, 'correct_question' => $correctCount,
-                    'incorrect_question' => $wrongCount,'blank_question' => $blank_question]);
+            $query = $this->conn->prepare("Insert into exam_attempts(exam_id, user_id, start_time, end_time, score, status) 
+                VALUES (:exam_id, :user_id, :start_time, :end_time, :score, :status)");
+            $query->execute(['exam_id' => $exam_id, 'user_id' => $user_id,'start_time' => $start_time, 'end_time' => $end_time, 'score' => $totalScore, 'status' => $status]);
 
-            // Lấy ID của bản ghi vừa được chèn
-            $id_results = $this->conn->lastInsertId();
 
-            // Thêm dữ liệu vào bảng `result_detail`
-            $detailQuery = $this->conn->prepare("INSERT INTO result_detail (id_result, id_question, answer) VALUES (:id_result, :id_question, :answer)");
+            $attempt_id = $this->conn->lastInsertId();
 
-            if(count($details) > 0) {
-                foreach ($details as $detail) {
-                    $detail['id_result'] = $id_results; // Gán `id_result` cho từng câu hỏi
-                    $detailQuery->execute($detail);
+            // 4. Thêm chi tiết câu trả lời
+            $detailQuery = $this->conn->prepare("
+                INSERT INTO exam_answers (attempt_id, question_id, option_id, is_correct) 
+                VALUES (:attempt_id, :question_id, :option_id, :is_correct)
+            ");
+
+            foreach ($details as $question_id => $userAnswers) {
+                // Lấy danh sách đáp án đúng
+                $queryCorrect = $this->conn->prepare("
+                SELECT id 
+                FROM question_options 
+                WHERE question_id = :question_id AND is_correct = 1
+            ");
+                $queryCorrect->execute(['question_id' => $question_id]);
+                $correctAnswers = $queryCorrect->fetchAll(PDO::FETCH_COLUMN);
+
+                sort($userAnswers);
+                sort($correctAnswers);
+
+                $isCorrect = ($userAnswers == $correctAnswers) ? 1 : 0;
+
+                foreach ($userAnswers as $option_id) {
+                    $detailQuery->execute([
+                        'attempt_id' => $attempt_id,
+                        'question_id' => $question_id,
+                        'option_id' => $option_id,
+                        'is_correct' => $isCorrect
+                    ]);
                 }
             }
             $this->conn->commit();
-            return $id_results;
+            return $attempt_id;
         } catch (Throwable $e) {
             $this->conn->rollBack();
-            return 0;
+            return $e;
         }
     }
 

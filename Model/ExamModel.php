@@ -183,8 +183,9 @@ class ExamModel extends BaseModel
         try {
             // Lấy thông tin chi tiết bài thi
             $examQuery = $this->conn->prepare("
-                SELECT e.*
+                SELECT e.*, s.name as subject_name
                 FROM exams e
+                INNER JOIN subjects s ON e.subject_id = s.id
                 WHERE e.id = :id AND e.deleted = false
             ");
             $examQuery->execute(['id' => $id]);
@@ -196,16 +197,28 @@ class ExamModel extends BaseModel
             
             // Lấy danh sách câu hỏi của bài thi
             $questionsQuery = $this->conn->prepare("
-                SELECT q.id
+                SELECT q.*
                 FROM questions q
                 INNER JOIN exam_questions eq ON q.id = eq.question_id
                 WHERE eq.exam_id = :exam_id AND q.deleted = false
             ");
             $questionsQuery->execute(['exam_id' => $id]);
             $questions = $questionsQuery->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($questions as &$question) {
+                $optionsQuery = $this->conn->prepare("
+                    SELECT o.id, o.option_text AS text, o.is_correct
+                    FROM question_options o
+                    WHERE o.question_id = :question_id
+                    ORDER BY o.id ASC
+                ");
+                $optionsQuery->execute(['question_id' => $question['id']]);
+                $question['answers'] = $optionsQuery->fetchAll(PDO::FETCH_ASSOC);
+            }
             
             // Gộp thông tin bài thi và câu hỏi
             $exam['selectedQuestions'] = array_column($questions, 'id');
+            $exam['questions'] = $questions;
             
             return $exam;
             

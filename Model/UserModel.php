@@ -65,9 +65,8 @@ class UserModel extends BaseModel
         try {
             $email = $data['email'];
             $pass = md5($data['password']);
-            $role = $data['role'];
-            $query = $this->conn->prepare("select * from $this->table where email=:email and password=:password and role=:role LIMIT 1");
-            $query->execute(['email' => $email, 'password' => $pass, 'role' => $role]);
+            $query = $this->conn->prepare("select users.*, role.code from users Inner join role on users.role_id = role.id where users.email=:email and users.password=:password LIMIT 1");
+            $query->execute(['email' => $email, 'password' => $pass]);
             $user = $query->fetch(PDO::FETCH_ASSOC);
             if ($query->rowCount() > 0) {
                 $timeCreate = time();
@@ -78,9 +77,10 @@ class UserModel extends BaseModel
                     'data' => [
                         'id' => $user['id'],
                         'email' => $user['email'],
-                        'name' => $user['name'],
-                        'role' => $user['role'],
-                        'phone' => $user['phone'],
+                        'full_name' => $user['full_name'],
+                        'role_id' => $user['role_id'],
+                        'roles' => $user['code'],
+                        'username' => $user['username'],
                         'type_account' => 'account'
                     ]
                 ];

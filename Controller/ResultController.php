@@ -38,7 +38,7 @@ class ResultController
             echo json_encode(['message' => "Có lỗi xảy ra!"]);
         } else {
             http_response_code(200);
-            echo json_encode(['id_result' => $result]);
+            echo json_encode(['result_id' => $result]);
         }
     }
 

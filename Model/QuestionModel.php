@@ -204,15 +204,26 @@ class QuestionModel extends BaseModel
     }
 
     public function getQuestionInExam($id){
-        $conn = ConnectionDB::GetConnect();
         try {
-            $query = $conn->prepare("select questions.* from questions 
-                inner join question_exam on questions.id = question_exam.id_question 
-                where id_exam=:id");
+            $query = $this->conn->prepare("select questions.* from questions 
+                inner join exam_questions on questions.id = exam_questions.question_id 
+                where exam_id=:id");
             $query->execute(['id'=>$id]);
+            $questions = $query->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($questions as &$question) {
+                $optionsQuery = $this->conn->prepare("
+                    SELECT o.id, o.option_text AS text, o.is_correct
+                    FROM question_options o
+                    WHERE o.question_id = :question_id
+                    ORDER BY o.id ASC
+                ");
+                $optionsQuery->execute(['question_id' => $question['id']]);
+                $question['answers'] = $optionsQuery->fetchAll(PDO::FETCH_ASSOC);
+            }
         } catch (Throwable $e) {
             return null;
         }
-        return $query->fetchAll();
+        return $questions;
     }
 }
