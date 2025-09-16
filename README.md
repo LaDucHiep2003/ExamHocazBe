@@ -15,7 +15,7 @@ cd ExamHocazBe
 composer install
 cp .env.example .env
 php -S localhost:8000
-
+```
 ## TK admin
 tk: laduchiep2003@gmail.com
 mk : 123456cA%
