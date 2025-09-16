@@ -1,5 +1,7 @@
 
 <?php
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 include_once __DIR__ . '/../Controller/QuestionController.php';
 include_once __DIR__ . '/../Routes/handleRouter.php';
@@ -32,6 +34,31 @@ $methodRequest = $_SERVER['REQUEST_METHOD'];
 $UriRequest = $_SERVER['REQUEST_URI'];
 // lấy URI chính
 $UriRequest = strtok($UriRequest, '?');
+
+function authMiddleware() {
+    $headers = apache_request_headers();
+    $key = getenv('Key');
+
+    try {
+        if (!isset($headers['Authorization'])) {
+            return false;
+        }
+
+        $authHeader = $headers['Authorization'];
+        if (strpos($authHeader, 'Bearer ') !== 0) {
+            return false;
+        }
+
+        $jwt = str_replace('Bearer ', '', $authHeader);
+        $decoded = JWT::decode($jwt, new Key($key, 'HS256'));
+
+        $GLOBALS['user'] = (array)$decoded->data;
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
 $routers = [
     "GET" => [
         '/questions' => function () use ($QuestionController) {
@@ -41,7 +68,7 @@ $routers = [
                 $QuestionController->index();
             }
         },
-        '/exams' => function () use ($ExamController) {
+        '/exams' =>function () use ($ExamController) {
             if (isset($_GET['chapter'])) {
                 $ExamController->getExamsOfChapter((int)$_GET['chapter']);
             }else{
@@ -123,36 +150,39 @@ $routers = [
         },
     ],
     "POST" => [
-        "/category" => function () use ($ExamCategoryController) {
+        "/category" => [function () use ($ExamCategoryController) {
             $ExamCategoryController->create();
         },
+            'authMiddleware'
+        ],
         "/categoryparent" => function () use ($CategoryParentController) {
             $CategoryParentController->create();
         },
-        "/subjects" => function () use ($SubjectController) {
+        "/subjects" => [function () use ($SubjectController) {
             $SubjectController->create();
         },
-        "/chapter" => function () use ($ChapterController) {
+            'authMiddleware'
+        ],
+        "/chapter" => [function () use ($ChapterController) {
             $ChapterController->create();
         },
-        "/exams" => function () use ($ExamController) {
+            'authMiddleware'
+        ],
+        "/exams" =>[ function () use ($ExamController) {
             $ExamController->create();
         },
-        "/questions" => function () use ($QuestionController) {
+            'authMiddleware'
+        ],
+        "/questions" => [function () use ($QuestionController) {
             $QuestionController->create();
         },
-        "/difficulty" => function () use ($IRTController) {
-            $IRTController->difficulty();
-        },
-        "/theta" => function () use ($IRTController) {
-            $IRTController->theta();
-        },
-        "/outfit" => function () use ($IRTController) {
-            $IRTController->Outfit();
-        },
-        "/results" => function () use ($ResultController) {
+            'authMiddleware'
+        ],
+        "/results" => [function () use ($ResultController) {
             $ResultController->create();
         },
+            'authMiddleware'
+        ],
         "/login" => function () use ($UserController) {
             $UserController->login();
         },
@@ -162,9 +192,11 @@ $routers = [
     ],
 
     "PATCH" => [
-        '/exams' => function () use ($ExamController) {
+        '/exams' => [function () use ($ExamController) {
             $ExamController->edit();
         },
+            'authMiddleware'
+        ],
         '/category/(\d+)' => function ($id) use ($ExamCategoryController) {
             $ExamCategoryController->edit($id);
         },
@@ -186,18 +218,24 @@ $routers = [
     ],
 
     "DELETE" =>[
-        "/category/(\d+)" => function ($id) use ($ExamCategoryController) {
+        "/category/(\d+)" => [function ($id) use ($ExamCategoryController) {
             $ExamCategoryController->delete($id);
         },
+            'authMiddleware'
+        ],
         "/categoryparent/(\d+)" => function ($id) use ($CategoryParentController) {
             $CategoryParentController->delete($id);
         },
-        "/exams/(\d+)" => function ($id) use ($ExamController) {
+        "/exams/(\d+)" => [function ($id) use ($ExamController) {
             $ExamController->delete($id);
         },
-        "/questions/(\d+)" => function ($id) use ($QuestionController) {
+            'authMiddleware'
+        ],
+        "/questions/(\d+)" => [function ($id) use ($QuestionController) {
             $QuestionController->delete($id);
         },
+            'authMiddleware'
+        ],
         "/subject/(\d+)" => function ($id) use ($SubjectController) {
             $SubjectController->delete($id);
         },
